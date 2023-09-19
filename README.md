@@ -5,7 +5,7 @@
 
 集成了项目开发过程中经常用到的基础包，欢迎 Merge Request。由于工具包的项目特性，所以代码平铺在根目录下。
 
-`go get -u github.com/common`
+`go get -u github.com/maxliu9403/common`
 
 
 ## 简要说明

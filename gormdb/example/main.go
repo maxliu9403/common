@@ -12,8 +12,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/common/gormdb"
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/gormdb"
+	"github.com/maxliu9403/common/logger"
 	"gorm.io/gorm"
 )
 

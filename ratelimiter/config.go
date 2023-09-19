@@ -3,7 +3,7 @@ package ratelimiter
 import (
 	"context"
 
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/logger"
 	"golang.org/x/time/rate"
 )
 

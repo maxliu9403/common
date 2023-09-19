@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/Shopify/sarama"
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/logger"
 )
 
 var (

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/common/gadget"
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/gadget"
+	"github.com/maxliu9403/common/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"

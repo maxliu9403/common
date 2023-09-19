@@ -1,7 +1,7 @@
 package cronjob
 
 import (
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/logger"
 	"github.com/robfig/cron/v3"
 )
 

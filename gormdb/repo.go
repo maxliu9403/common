@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/common/gadget"
-	"github.com/common/rsql"
+	"github.com/maxliu9403/common/gadget"
+	"github.com/maxliu9403/common/rsql"
 	"gorm.io/gorm"
 )
 

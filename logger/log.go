@@ -25,7 +25,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/common/gadget"
+	"github.com/maxliu9403/common/gadget"
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber/jaeger-client-go"
 	"go.uber.org/zap"

@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/common/httputil"
+	"github.com/maxliu9403/common/httputil"
 )
 
 type PostParams struct {

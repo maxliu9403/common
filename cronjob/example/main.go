@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/common/cronjob"
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/cronjob"
+	"github.com/maxliu9403/common/logger"
 	"time"
 )
 

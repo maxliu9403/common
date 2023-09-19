@@ -1,4 +1,4 @@
-module github.com/common
+module github.com/maxliu9403/common
 
 go 1.18
 

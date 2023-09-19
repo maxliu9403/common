@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/logger"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"

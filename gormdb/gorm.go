@@ -11,7 +11,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/common/gadget"
+	"github.com/maxliu9403/common/gadget"
 	"gorm.io/gorm"
 	"gorm.io/plugin/dbresolver"
 )

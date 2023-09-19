@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/logger"
 )
 
 const timeFormat = "0102150405"

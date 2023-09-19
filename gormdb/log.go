@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/logger"
 	logg "gorm.io/gorm/logger"
 	"gorm.io/gorm/utils"
 )

@@ -10,7 +10,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/logger"
 	"github.com/go-redis/redis/v8"
 )
 

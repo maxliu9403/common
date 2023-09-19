@@ -11,7 +11,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/logger"
 	"github.com/opentracing/opentracing-go"
 	"github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"

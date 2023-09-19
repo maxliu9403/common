@@ -9,8 +9,8 @@ package main
 import (
 	"context"
 
-	"github.com/common/kafka"
-	"github.com/common/logger"
+	"github.com/maxliu9403/common/kafka"
+	"github.com/maxliu9403/common/logger"
 )
 
 var exampleConfig = kafka.Config{

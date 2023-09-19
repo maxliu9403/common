@@ -7,9 +7,9 @@
 package main
 
 import (
-	"github.com/common/logger"
-	"github.com/common/middleware"
-	"github.com/common/tracer"
+	"github.com/maxliu9403/common/logger"
+	"github.com/maxliu9403/common/middleware"
+	"github.com/maxliu9403/common/tracer"
 	"github.com/gin-gonic/gin"
 )
 
