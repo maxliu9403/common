@@ -2,9 +2,10 @@ package etcd
 
 import (
 	"context"
-	"github.com/maxliu9403/common/logger"
+	"log"
 	"sync"
 	"testing"
+	"time"
 )
 
 const (
@@ -14,13 +15,7 @@ const (
 func initEtcd() (cancelFunc context.CancelFunc, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	etcdConfig := &Config{
-		Endpoints:    "",
-		DialTimeout:  0,
-		Username:     "Username",
-		Password:     "Password",
-		CAFilePath:   "Password",
-		CertFilePath: "CertFilePath",
-		KeyFilePath:  "KeyFilePath",
+		Endpoints: "127.0.0.1:2379",
 	}
 	err = etcdConfig.Init(ctx)
 	if err != nil {
@@ -85,14 +80,28 @@ func TestGet(t *testing.T) {
 			defer wg.Done()
 			resp, err := Cli().Get(k, 0)
 			if err != nil {
-				logger.Errorf(err.Error())
+				log.Fatal(err.Error())
 				return
 			}
-			logger.Debug(resp.Kvs)
+			log.Println(resp.Kvs)
 		}()
 	}
 
 	wg.Wait()
+}
+
+func TestPut(t *testing.T) {
+	cancel, err := initEtcd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer cancel()
+
+	resp, err := Cli().Put(TestPrefix, "value")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(resp)
 }
 
 func TestDelete(t *testing.T) {
@@ -114,10 +123,35 @@ func TestLock(t *testing.T) {
 	}
 	defer cancel()
 
-	lockKey := "lockKey"
-	taskPrefix := "taskPrefix"
-	taskKey := taskPrefix + "taskID"
-	resp, err := Cli().Lock(lockKey, taskKey)
+	lockKey := TestPrefix
+	resp, err := Cli().Lock(lockKey, 10, time.Second*20)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(resp)
+}
+
+func TestUnLock(t *testing.T) {
+	cancel, err := initEtcd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cancel()
+
+	lockKey := TestPrefix
+	resp, err := Cli().Lock(lockKey, 2, time.Second*1)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("resp:%v", resp)
+	log.Println("doing")
+
+	// 超出ttl，会进行续租
+	time.Sleep(time.Second * 3)
+
+	err = Cli().Unlock(resp.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/maxliu9403/common/logger"
+	"time"
 
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -77,6 +78,15 @@ func (e *Client) checkClient() error {
 		return fmt.Errorf("etcd client is not initialized yet")
 	}
 
+	// 健康检测
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := e.cli.Get(ctx, "non-existent-key-for-health-check")
+	if err != nil {
+		return fmt.Errorf("failed to communicate with etcd: %v", err)
+	}
+
 	return nil
 }
 
@@ -102,6 +112,8 @@ func (e *Client) Find(searchedKey string) (resp *clientv3.GetResponse, err error
 	return resp, err
 }
 
+// Get
+// revision 指定版本
 func (e *Client) Get(key string, revision int64) (resp *clientv3.GetResponse, err error) {
 	if err = e.checkClient(); err != nil {
 		return
@@ -166,30 +178,106 @@ func (e *Client) Delete(key string) (err error) {
 	return err
 }
 
-func (e *Client) Lock(key, taskKey string) (grantResp *clientv3.LeaseGrantResponse, err error) {
-	logger.Debugf("lock task %s with key %s", taskKey, key)
+/*
+
+在分布式系统中，续约是一个重要的机制，尤其是当我们使用基于租约的锁或其他资源时。以下是为什么需要续约的几个原因：
+
+1.处理长时间运行的任务：当一个客户端获取锁并开始执行任务时，如果任务的执行时间超过了锁的租约时间，那么锁会在任务完成之前自动过期。
+这可能会导致其他客户端在第一个任务完成之前获取锁，从而引发数据不一致或其他问题。通过定期续约，我们可以确保锁在任务完成之前不会过期。
+
+2.容错和网络不稳定：在分布式系统中，网络延迟和短暂的网络中断是常见的。如果一个客户端因为网络问题暂时与etcd失去了连接，
+但在租约时间内重新连接，那么它应该有机会续约其锁，而不是立即失去它。
+
+3.避免"僵尸"锁：在某些情况下，持有锁的客户端可能会崩溃或被意外终止。
+如果没有租约机制，这个锁可能会永远存在，导致资源被永久锁定。通过设置租约，我们可以确保这种"僵尸"锁在一段时间后自动释放，从而允许其他客户端获取资源。
+
+4.提供更多的灵活性：续约机制允许客户端基于其当前的工作负载和资源需求动态地调整锁的持有时间。
+例如，如果一个客户端知道它需要更长的时间来完成任务，它可以选择续约锁，而不是释放它并重新获取。
+
+5.减少资源争用：在高并发的环境中，多个客户端可能会频繁地尝试获取和释放锁。
+通过允许客户端续约其锁，我们可以减少锁的争用，从而提高系统的整体效率。
+
+总的来说，续约机制为分布式锁提供了一个有效的方式来管理资源的生命周期，确保数据的一致性，并提高系统的可靠性和效率。
+
+*/
+func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID) {
+	ticker := time.NewTicker(time.Duration(ttl/2) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-e.ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := e.cli.KeepAliveOnce(e.ctx, leaseID); err != nil {
+				logger.Error("failed to renew lease: %v", err)
+				return
+			}
+		}
+	}
+}
+
+// Lock
+// ttl:加锁时间（秒）
+// timeout 等待加锁时间
+func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *clientv3.LeaseGrantResponse, err error) {
+	timeoutCtx, cancel := context.WithTimeout(e.ctx, timeout)
+	defer cancel()
+
 	if err = e.checkClient(); err != nil {
 		return
 	}
 
-	kv := clientv3.NewKV(e.cli)
-	lease := clientv3.NewLease(e.cli)
-	granted, err := lease.Grant(e.ctx, 60)
-	if err != nil {
-		return
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return nil, fmt.Errorf("failed to acquire lock within %v: %v", timeout, timeoutCtx.Err())
+		default:
+			// 创建租约
+			lease, err := e.cli.Grant(e.ctx, ttl)
+			if err != nil {
+				return nil, fmt.Errorf("failed to grant lease: %v", err)
+			}
+
+			txn := clientv3.NewKV(e.cli).Txn(e.ctx)
+			// 判断key是否存在，不存在将 key 设置为当前时间， 并关联到前面创建的租约
+			txn.If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).
+				Then(clientv3.OpPut(key, time.Now().String(), clientv3.WithLease(lease.ID))).
+				Else()
+			txnResp, err := txn.Commit()
+			if err != nil {
+				return nil, fmt.Errorf("failed to commit transaction: %v", err)
+			}
+
+			if txnResp.Succeeded {
+				// 续约
+				go e.keepAlive(ttl, lease.ID)
+				return lease, nil
+			}
+			// 如果锁被占用，使用watch监听锁释放
+			watchCh := e.cli.Watch(timeoutCtx, key)
+			for item := range watchCh {
+				for _, ev := range item.Events {
+					// 被释放，立即返回获取锁
+					if ev.Type == clientv3.EventTypeDelete {
+						break
+					}
+				}
+			}
+
+		}
 	}
 
-	txn := kv.Txn(e.ctx)
-	txn.If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).
-		Then(clientv3.OpPut(key, "lock", clientv3.WithLease(granted.ID)), clientv3.OpDelete(taskKey)).
-		Else()
-	txnResp, err := txn.Commit()
-	if err != nil {
-		return
-	}
-	if !txnResp.Succeeded {
-		return granted, fmt.Errorf("lock failed")
-	}
+}
 
-	return granted, err
+// Unlock 解锁续约
+func (e *Client) Unlock(leaseID clientv3.LeaseID) error {
+	if err := e.checkClient(); err != nil {
+		return err
+	}
+	// 释放基于租约的锁，锁的生命周期与其关联的租约紧密相关
+	if _, err := e.cli.Revoke(e.ctx, leaseID); err != nil {
+		return fmt.Errorf("failed to revoke lease: %v", err)
+	}
+	return nil
 }
