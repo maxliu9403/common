@@ -14,6 +14,10 @@
 .
 ├── apiserver
 │ 一组 gin server 启停的代码。实际使用案例可见 go-template 项目
+├── cronjob
+│ 定时任务
+├── etcd
+│ 封装的 etcd 客户端 
 ├── gadget
 │ 一些常用的小函数，包含生成 UUID 等
 ├── ginpprof
