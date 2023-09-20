@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	TestPrefix = "/template/diagram/"
+	TestPrefix = "/template"
 )
 
 func initEtcd() (cancelFunc context.CancelFunc, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	etcdConfig := &Config{
-		Endpoints: "127.0.0.1:2379",
+		Endpoints: "127.0.0.1:3379",
 	}
 	err = etcdConfig.Init(ctx)
 	if err != nil {
@@ -181,7 +181,7 @@ func TestLockConcurrency(t *testing.T) {
 			defer wg.Done()
 
 			// 尝试获取锁
-			resp, err := cli.Lock(lockKey, 3, time.Second*2)
+			resp, err := cli.Lock(lockKey, 1, time.Second*2)
 			if err != nil {
 				log.Fatalf(" goroutine %d 获取锁失败: %v", id, err)
 			}
