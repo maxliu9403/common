@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"sync"
 	"testing"
@@ -157,4 +158,56 @@ func TestUnLock(t *testing.T) {
 	}
 
 	t.Log(resp)
+}
+
+func TestLockConcurrency(t *testing.T) {
+	cancel, err := initEtcd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer cancel()
+
+	const numGoroutines = 10
+	const lockKey = "test-lock"
+
+	var (
+		counter int // 通过维护和检查 counter，可以确保锁确实提供了互斥访问
+		wg      sync.WaitGroup
+	)
+	cli := Cli()
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			// 尝试获取锁
+			resp, err := cli.Lock(lockKey, 3, time.Second*2)
+			if err != nil {
+				log.Fatalf(" goroutine %d 获取锁失败: %v", id, err)
+			}
+			log.Printf("goroutine %d 获取锁，leaseId %v ", id, resp.ID)
+			// 更新共享状态
+			counter++
+			if counter > 1 {
+				log.Fatal("多个goroutine同时访问临界区")
+			}
+			// doing
+			time.Sleep(100 * time.Millisecond)
+			log.Printf("goroutine %d doing....", id)
+			counter--
+
+			// 释放锁
+			log.Printf("goroutine %d 释放锁，leaseId %v \n-------------------", id, resp.ID)
+			err = cli.Unlock(resp.ID)
+			if err != nil {
+				log.Fatalf("goroutine %d 释放锁失败: %v", id, err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	cli.Close()
+
+	// 断言共享状态没有被并发访问
+	assert.Equal(t, 0, counter, "共享状态被同时访问")
 }

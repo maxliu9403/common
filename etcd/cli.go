@@ -79,13 +79,13 @@ func (e *Client) checkClient() error {
 	}
 
 	// 健康检测
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	_, err := e.cli.Get(ctx, "non-existent-key-for-health-check")
-	if err != nil {
-		return fmt.Errorf("failed to communicate with etcd: %v", err)
-	}
+	//ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	//defer cancel()
+	//
+	//_, err := e.cli.Get(ctx, "non-existent-key-for-health-check")
+	//if err != nil {
+	//	return fmt.Errorf("failed to communicate with etcd: %v", err)
+	//}
 
 	return nil
 }
@@ -201,7 +201,13 @@ func (e *Client) Delete(key string) (err error) {
 
 */
 func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID) {
-	ticker := time.NewTicker(time.Duration(ttl/2) * time.Second)
+	// 特殊case，避免interval=0时触发NewTicker的Panic
+	interval := ttl / 2
+	if interval <= 0 {
+		interval = 1
+	}
+	// 1/2 ttl时间时开始续租
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -210,7 +216,7 @@ func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID) {
 			return
 		case <-ticker.C:
 			if _, err := e.cli.KeepAliveOnce(e.ctx, leaseID); err != nil {
-				logger.Error("failed to renew lease: %v", err)
+				logger.Errorf("failed to renew lease: %v, leaseID:%v", err.Error(), leaseID)
 				return
 			}
 		}
@@ -228,6 +234,7 @@ func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *
 		return
 	}
 
+	shouldContinueWatching := true // 用于控制外部循环
 	for {
 		select {
 		case <-timeoutCtx.Done():
@@ -260,8 +267,12 @@ func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *
 				for _, ev := range item.Events {
 					// 被释放，立即返回获取锁
 					if ev.Type == clientv3.EventTypeDelete {
+						shouldContinueWatching = false // 用于控制外部循环
 						break
 					}
+				}
+				if !shouldContinueWatching {
+					break
 				}
 			}
 
