@@ -228,10 +228,10 @@ func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID, ctx context.Cont
 	}
 }
 
-// Lock
+// TryAcquireLockBlocking 阻塞等待
 // ttl:加锁时间（秒）
 // timeout 等待加锁时间
-func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *clientv3.LeaseGrantResponse, err error) {
+func (e *Client) TryAcquireLockBlocking(key string, ttl int64, timeout time.Duration) (grantResp *clientv3.LeaseGrantResponse, err error) {
 	timeoutCtx, cancel := context.WithTimeout(e.ctx, timeout)
 	defer cancel()
 
@@ -244,7 +244,7 @@ func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *
 	for {
 		select {
 		case <-timeoutCtx.Done():
-			return nil, fmt.Errorf("failed to acquire lock within %v: %v", timeout, timeoutCtx.Err())
+			return nil, fmt.Errorf("failed to acquire etcd lock within %v: %v", timeout, timeoutCtx.Err())
 		default:
 			// 创建租约
 			lease, err := e.cli.Grant(e.ctx, ttl)
@@ -284,6 +284,43 @@ func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *
 
 		}
 	}
+}
+
+// TryAcquireLock 非阻塞
+func (e *Client) TryAcquireLock(key string, ttl int64) (grantResp *clientv3.LeaseGrantResponse, err error) {
+	if err = e.checkClient(); err != nil {
+		return
+	}
+
+	e.leaseCancelFunc = map[clientv3.LeaseID]context.CancelFunc{}
+
+	// 创建租约
+	lease, err := e.cli.Grant(e.ctx, ttl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to grant lease: %v", err)
+	}
+
+	txn := clientv3.NewKV(e.cli).Txn(e.ctx)
+	// 判断key是否存在，不存在将 key 设置为当前时间， 并关联到前面创建的租约
+	txn.If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).
+		Then(clientv3.OpPut(key, time.Now().String(), clientv3.WithLease(lease.ID))).
+		Else()
+	txnResp, err := txn.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
+	if txnResp.Succeeded {
+		// 为每个续约创建一个ctx，便于unlock时取消续约
+		leaseCtx, leaseCancel := context.WithCancel(e.ctx)
+		e.leaseCancelFunc[lease.ID] = leaseCancel
+		// 续约
+		go e.keepAlive(ttl, lease.ID, leaseCtx)
+		return lease, nil
+	}
+
+	// 如果锁被占用，立即返回一个错误
+	return nil, fmt.Errorf("etcd lock is currently held by another client")
 }
 
 // Unlock 解锁续约
