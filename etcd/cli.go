@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/maxliu9403/common/logger"
-	"time"
-
+	"github.com/samber/lo"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"time"
 )
 
 var (
@@ -22,8 +22,9 @@ type CliConfig struct {
 }
 
 type Client struct {
-	ctx context.Context
-	cli *clientv3.Client
+	ctx             context.Context
+	cli             *clientv3.Client
+	leaseCancelFunc map[clientv3.LeaseID]context.CancelFunc // 控制解锁后释放续约
 }
 
 func Default() *CliConfig {
@@ -200,18 +201,22 @@ func (e *Client) Delete(key string) (err error) {
 总的来说，续约机制为分布式锁提供了一个有效的方式来管理资源的生命周期，确保数据的一致性，并提高系统的可靠性和效率。
 
 */
-func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID) {
+func (e *Client) keepAlive(leaseCtx context.Context, ttl int64, leaseID clientv3.LeaseID) {
 	// 特殊case，避免interval=0时触发NewTicker的Panic
 	interval := ttl / 2
 	if interval <= 0 {
 		interval = 1
 	}
+
 	// 1/2 ttl时间时开始续租
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
+		// 监听续租被释放
+		case <-leaseCtx.Done():
+			return
 		case <-e.ctx.Done():
 			return
 		case <-ticker.C:
@@ -223,10 +228,10 @@ func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID) {
 	}
 }
 
-// Lock
+// TryLockBlocking 阻塞等待
 // ttl:加锁时间（秒）
 // timeout 等待加锁时间
-func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *clientv3.LeaseGrantResponse, err error) {
+func (e *Client) TryLockBlocking(key string, ttl int64, timeout time.Duration) (grantResp *clientv3.LeaseGrantResponse, err error) {
 	timeoutCtx, cancel := context.WithTimeout(e.ctx, timeout)
 	defer cancel()
 
@@ -234,11 +239,12 @@ func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *
 		return
 	}
 
+	e.leaseCancelFunc = map[clientv3.LeaseID]context.CancelFunc{}
 	shouldContinueWatching := true // 用于控制外部循环
 	for {
 		select {
 		case <-timeoutCtx.Done():
-			return nil, fmt.Errorf("failed to acquire lock within %v: %v", timeout, timeoutCtx.Err())
+			return nil, fmt.Errorf("failed to acquire etcd lock within %v: %v", timeout, timeoutCtx.Err())
 		default:
 			// 创建租约
 			lease, err := e.cli.Grant(e.ctx, ttl)
@@ -257,20 +263,20 @@ func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *
 			}
 
 			if txnResp.Succeeded {
+				// 为每个续约创建一个ctx，便于unlock时取消续约
+				leaseCtx, leaseCancel := context.WithCancel(e.ctx)
+				e.leaseCancelFunc[lease.ID] = leaseCancel
 				// 续约
-				go e.keepAlive(ttl, lease.ID)
+				go e.keepAlive(leaseCtx, ttl, lease.ID)
 				return lease, nil
 			}
+
 			// 如果锁被占用，使用watch监听锁释放
 			watchCh := e.cli.Watch(timeoutCtx, key)
 			for item := range watchCh {
-				for _, ev := range item.Events {
-					// 被释放，立即返回获取锁
-					if ev.Type == clientv3.EventTypeDelete {
-						shouldContinueWatching = false // 用于控制外部循环
-						break
-					}
-				}
+				lo.ForEach(item.Events, func(ev *clientv3.Event, _ int) {
+					shouldContinueWatching = lo.If(ev.Type == clientv3.EventTypeDelete, false).Else(true)
+				})
 				if !shouldContinueWatching {
 					break
 				}
@@ -278,11 +284,52 @@ func (e *Client) Lock(key string, ttl int64, timeout time.Duration) (grantResp *
 
 		}
 	}
+}
 
+// TryLock 非阻塞
+func (e *Client) TryLock(key string, ttl int64) (grantResp *clientv3.LeaseGrantResponse, err error) {
+	if err = e.checkClient(); err != nil {
+		return
+	}
+
+	e.leaseCancelFunc = map[clientv3.LeaseID]context.CancelFunc{}
+
+	// 创建租约
+	lease, err := e.cli.Grant(e.ctx, ttl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to grant lease: %v", err)
+	}
+
+	txn := clientv3.NewKV(e.cli).Txn(e.ctx)
+	// 判断key是否存在，不存在将 key 设置为当前时间， 并关联到前面创建的租约
+	txn.If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).
+		Then(clientv3.OpPut(key, time.Now().String(), clientv3.WithLease(lease.ID))).
+		Else()
+	txnResp, err := txn.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
+	if txnResp.Succeeded {
+		// 为每个续约创建一个ctx，便于unlock时取消续约
+		leaseCtx, leaseCancel := context.WithCancel(e.ctx)
+		e.leaseCancelFunc[lease.ID] = leaseCancel
+		// 续约
+		go e.keepAlive(leaseCtx, ttl, lease.ID)
+		return lease, nil
+	}
+
+	// 如果锁被占用，立即返回一个错误
+	return nil, fmt.Errorf("etcd lock is currently held by another client")
 }
 
 // Unlock 解锁续约
 func (e *Client) Unlock(leaseID clientv3.LeaseID) error {
+	// 释放续约
+	if cancelFunc, exists := e.leaseCancelFunc[leaseID]; exists {
+		cancelFunc()
+		delete(e.leaseCancelFunc, leaseID)
+	}
 	if err := e.checkClient(); err != nil {
 		return err
 	}

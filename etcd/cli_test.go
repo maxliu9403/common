@@ -10,13 +10,13 @@ import (
 )
 
 const (
-	TestPrefix = "/template/diagram/"
+	TestPrefix = "/template"
 )
 
 func initEtcd() (cancelFunc context.CancelFunc, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	etcdConfig := &Config{
-		Endpoints: "127.0.0.1:2379",
+		Endpoints: "127.0.0.1:3379",
 	}
 	err = etcdConfig.Init(ctx)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestLock(t *testing.T) {
 	defer cancel()
 
 	lockKey := TestPrefix
-	resp, err := Cli().Lock(lockKey, 10, time.Second*20)
+	resp, err := Cli().TryLockBlocking(lockKey, 10, time.Second*20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestUnLock(t *testing.T) {
 	defer cancel()
 
 	lockKey := TestPrefix
-	resp, err := Cli().Lock(lockKey, 2, time.Second*1)
+	resp, err := Cli().TryLockBlocking(lockKey, 2, time.Second*1)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -160,7 +160,8 @@ func TestUnLock(t *testing.T) {
 	t.Log(resp)
 }
 
-func TestLockConcurrency(t *testing.T) {
+// 阻塞
+func TestLockConcurrencyBlocking(t *testing.T) {
 	cancel, err := initEtcd()
 	if err != nil {
 		log.Fatal(err)
@@ -181,9 +182,62 @@ func TestLockConcurrency(t *testing.T) {
 			defer wg.Done()
 
 			// 尝试获取锁
-			resp, err := cli.Lock(lockKey, 3, time.Second*2)
+			resp, err := cli.TryLockBlocking(lockKey, 1, time.Second*2)
 			if err != nil {
 				log.Fatalf(" goroutine %d 获取锁失败: %v", id, err)
+			}
+			log.Printf("goroutine %d 获取锁，leaseId %v ", id, resp.ID)
+			// 更新共享状态
+			counter++
+			if counter > 1 {
+				log.Fatal("多个goroutine同时访问临界区")
+			}
+			// doing
+			time.Sleep(100 * time.Millisecond)
+			log.Printf("goroutine %d doing....", id)
+			counter--
+
+			// 释放锁
+			log.Printf("goroutine %d 释放锁，leaseId %v \n-------------------", id, resp.ID)
+			err = cli.Unlock(resp.ID)
+			if err != nil {
+				log.Fatalf("goroutine %d 释放锁失败: %v", id, err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	cli.Close()
+
+	// 断言共享状态没有被并发访问
+	assert.Equal(t, 0, counter, "共享状态被同时访问")
+}
+
+// 非阻塞
+func TestLockConcurrency(t *testing.T) {
+	cancel, err := initEtcd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer cancel()
+
+	const numGoroutines = 10
+	const lockKey = "test-lock"
+
+	var (
+		counter int // 通过维护和检查 counter，可以确保锁确实提供了互斥访问
+		wg      sync.WaitGroup
+	)
+	cli := Cli()
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			// 尝试获取锁
+			resp, err := cli.TryLock(lockKey, 1)
+			if err != nil {
+				log.Printf(" goroutine %d 获取锁失败: %v", id, err)
+				return
 			}
 			log.Printf("goroutine %d 获取锁，leaseId %v ", id, resp.ID)
 			// 更新共享状态
