@@ -125,7 +125,7 @@ func TestLock(t *testing.T) {
 	defer cancel()
 
 	lockKey := TestPrefix
-	resp, err := Cli().TryAcquireLockBlocking(lockKey, 10, time.Second*20)
+	resp, err := Cli().TryLockBlocking(lockKey, 10, time.Second*20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestUnLock(t *testing.T) {
 	defer cancel()
 
 	lockKey := TestPrefix
-	resp, err := Cli().TryAcquireLockBlocking(lockKey, 2, time.Second*1)
+	resp, err := Cli().TryLockBlocking(lockKey, 2, time.Second*1)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestLockConcurrencyBlocking(t *testing.T) {
 			defer wg.Done()
 
 			// 尝试获取锁
-			resp, err := cli.TryAcquireLockBlocking(lockKey, 1, time.Second*2)
+			resp, err := cli.TryLockBlocking(lockKey, 1, time.Second*2)
 			if err != nil {
 				log.Fatalf(" goroutine %d 获取锁失败: %v", id, err)
 			}
@@ -234,7 +234,7 @@ func TestLockConcurrency(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			// 尝试获取锁
-			resp, err := cli.TryAcquireLock(lockKey, 1)
+			resp, err := cli.TryLock(lockKey, 1)
 			if err != nil {
 				log.Printf(" goroutine %d 获取锁失败: %v", id, err)
 				return

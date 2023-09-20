@@ -201,7 +201,7 @@ func (e *Client) Delete(key string) (err error) {
 总的来说，续约机制为分布式锁提供了一个有效的方式来管理资源的生命周期，确保数据的一致性，并提高系统的可靠性和效率。
 
 */
-func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID, ctx context.Context) {
+func (e *Client) keepAlive(leaseCtx context.Context, ttl int64, leaseID clientv3.LeaseID) {
 	// 特殊case，避免interval=0时触发NewTicker的Panic
 	interval := ttl / 2
 	if interval <= 0 {
@@ -215,7 +215,7 @@ func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID, ctx context.Cont
 	for {
 		select {
 		// 监听续租被释放
-		case <-ctx.Done():
+		case <-leaseCtx.Done():
 			return
 		case <-e.ctx.Done():
 			return
@@ -228,10 +228,10 @@ func (e *Client) keepAlive(ttl int64, leaseID clientv3.LeaseID, ctx context.Cont
 	}
 }
 
-// TryAcquireLockBlocking 阻塞等待
+// TryLockBlocking 阻塞等待
 // ttl:加锁时间（秒）
 // timeout 等待加锁时间
-func (e *Client) TryAcquireLockBlocking(key string, ttl int64, timeout time.Duration) (grantResp *clientv3.LeaseGrantResponse, err error) {
+func (e *Client) TryLockBlocking(key string, ttl int64, timeout time.Duration) (grantResp *clientv3.LeaseGrantResponse, err error) {
 	timeoutCtx, cancel := context.WithTimeout(e.ctx, timeout)
 	defer cancel()
 
@@ -267,7 +267,7 @@ func (e *Client) TryAcquireLockBlocking(key string, ttl int64, timeout time.Dura
 				leaseCtx, leaseCancel := context.WithCancel(e.ctx)
 				e.leaseCancelFunc[lease.ID] = leaseCancel
 				// 续约
-				go e.keepAlive(ttl, lease.ID, leaseCtx)
+				go e.keepAlive(leaseCtx, ttl, lease.ID)
 				return lease, nil
 			}
 
@@ -286,8 +286,8 @@ func (e *Client) TryAcquireLockBlocking(key string, ttl int64, timeout time.Dura
 	}
 }
 
-// TryAcquireLock 非阻塞
-func (e *Client) TryAcquireLock(key string, ttl int64) (grantResp *clientv3.LeaseGrantResponse, err error) {
+// TryLock 非阻塞
+func (e *Client) TryLock(key string, ttl int64) (grantResp *clientv3.LeaseGrantResponse, err error) {
 	if err = e.checkClient(); err != nil {
 		return
 	}
@@ -315,7 +315,7 @@ func (e *Client) TryAcquireLock(key string, ttl int64) (grantResp *clientv3.Leas
 		leaseCtx, leaseCancel := context.WithCancel(e.ctx)
 		e.leaseCancelFunc[lease.ID] = leaseCancel
 		// 续约
-		go e.keepAlive(ttl, lease.ID, leaseCtx)
+		go e.keepAlive(leaseCtx, ttl, lease.ID)
 		return lease, nil
 	}
 

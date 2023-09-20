@@ -9,14 +9,16 @@ package rediscache
 import (
 	"context"
 	"fmt"
+	"github.com/maxliu9403/common/logger"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 )
 
 type RedisCrud struct {
-	Ctx context.Context
-	Rdb *redis.Client
+	Ctx             context.Context
+	Rdb             *redis.Client
+	cancelRenewFunc map[string]context.CancelFunc // 控制解锁后释放续约
 }
 
 func NewCRUD(ctx context.Context, cli *redis.Client) BasicCrud {
@@ -39,54 +41,69 @@ func (c *RedisCrud) Set(key string, value interface{}, timeOut time.Duration) (e
 	return c.Rdb.Set(c.Ctx, key, value, timeOut).Err()
 }
 
-//func (c *RedisCrud) KeepAlive(key string, interval time.Duration, extension time.Duration) {
-//	ticker := time.NewTicker(interval)
-//	defer ticker.Stop()
-//
-//	for {
-//		select {
-//		case <-ticker.C:
-//			// 检查锁的剩余生存时间
-//			ttl, err := c.Rdb.TTL(c.Ctx, key).Result()
-//			if err != nil || ttl <= 0 {
-//				// 锁已经过期或出现错误，停止续租
-//				return
-//			}
-//			if ttl < interval {
-//				// 如果锁的生存时间低于阈值，为其增加更多的生存时间
-//				_, err := c.Rdb.Expire(c.Ctx, key, ttl+extension).Result()
-//				if err != nil {
-//					// 处理错误，例如记录日志
-//				}
-//			}
-//		case <-c.Ctx.Done():
-//			// 上下文被取消或超时，停止续租
-//			return
-//		}
-//	}
-//}
+func (c *RedisCrud) keepAlive(lockCtx context.Context, key string, expiration time.Duration) {
+	// 1/2 过期时间时开始续租
+	ticker := time.NewTicker(expiration / 2)
+	defer ticker.Stop()
+	fmt.Println(22999)
+	for {
+		select {
+		// 监听续租被释放
+		case <-lockCtx.Done():
+			fmt.Println("Done")
+			return
+		case <-c.Ctx.Done():
+			return
+		case <-ticker.C:
+			// 获取过期剩余时间
+			//ttl, err := c.Rdb.TTL(c.Ctx, key).Result()
+			//fmt.Println(ttl.Seconds(), key, "ttl.Seconds()")
+			//if err != nil || ttl <= 0 {
+			//	logger.Errorf("failed to renew redis distributed lock : %v, key:%v", err, key)
+			//	// 锁已经过期或出现错误，停止续租
+			//	return
+			//}
+			// 为其增加更多的生存时间，延长一倍的过期时间，因为最小过期时间需要1秒
+			_, err := c.Rdb.Expire(c.Ctx, key, expiration).Result()
+			if err != nil {
+				// 处理错误，例如记录日志
+				logger.Errorf("failed to renew redis distributed lock : %v, key:%v", err.Error(), key)
+				return
+			}
+		}
+	}
+}
 
-// TryAcquireLock 非阻塞
-func (c *RedisCrud) TryAcquireLock(key, uuid string, expiration time.Duration) (bool, error) {
+// TryLock 非阻塞
+// expiration 最小单位1秒
+func (c *RedisCrud) TryLock(key, uuid string, expiration int) (bool, error) {
 	if c.Rdb == nil {
 		return false, fmt.Errorf("redis client is not initialized yet")
 	}
-
+	c.cancelRenewFunc = map[string]context.CancelFunc{}
+	duration := time.Duration(expiration) * time.Second
 	// 使用SETNX命令尝试获取锁
-	ok, err := c.Rdb.SetNX(c.Ctx, key, uuid, expiration).Result()
+	ok, err := c.Rdb.SetNX(c.Ctx, key, uuid, duration).Result()
 	if err != nil {
 		return false, err
 	}
-
-	//go c.KeepAlive(key)
+	// 获取到锁，启动续约
+	if ok {
+		uniqueKey := key + uuid
+		lockCtx, lockKeyCancel := context.WithCancel(c.Ctx)
+		c.cancelRenewFunc[uniqueKey] = lockKeyCancel
+		fmt.Println(c.cancelRenewFunc, "cancelRenewFunc")
+		go c.keepAlive(lockCtx, key, duration)
+	}
 	return ok, nil
 }
 
-// TryAcquireLockBlocking 阻塞
-func (c *RedisCrud) TryAcquireLockBlocking(key, uuid string, expiration time.Duration, timeout time.Duration) (bool, error) {
+// TryLockBlocking 阻塞
+func (c *RedisCrud) TryLockBlocking(key, uuid string, expiration int, timeout time.Duration) (bool, error) {
 	if c.Rdb == nil {
 		return false, fmt.Errorf("redis client is not initialized yet")
 	}
+	c.cancelRenewFunc = map[string]context.CancelFunc{}
 	timeoutCtx, cancel := context.WithTimeout(c.Ctx, timeout)
 	defer cancel()
 	for {
@@ -96,13 +113,11 @@ func (c *RedisCrud) TryAcquireLockBlocking(key, uuid string, expiration time.Dur
 		case <-timeoutCtx.Done():
 			return false, fmt.Errorf("failed to acquire redis lock within %v: %v", timeout, timeoutCtx.Err())
 		default:
-			ok, err := c.TryAcquireLock(key, uuid, expiration)
+			ok, err := c.TryLock(key, uuid, expiration)
 			if err != nil {
 				return false, err
 			}
-			if ok {
-				return true, nil
-			}
+			return ok, nil
 		}
 	}
 }
@@ -121,5 +136,16 @@ func (c *RedisCrud) UnLock(key, uuid string) error {
 		end
 	`
 	_, err := c.Rdb.Eval(c.Ctx, script, []string{key}, uuid).Result()
+	if err != nil {
+		return err
+	}
+	uniqueKey := key + uuid
+	fmt.Println(uniqueKey)
+	// 释放续约
+	if cancelFunc, exists := c.cancelRenewFunc[uniqueKey]; exists {
+		fmt.Println(1189898)
+		cancelFunc()
+		delete(c.cancelRenewFunc, uniqueKey)
+	}
 	return err
 }

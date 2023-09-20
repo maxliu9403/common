@@ -73,7 +73,7 @@ func TestLock(t *testing.T) {
 
 	cli := GetCli()
 	curd := NewCRUD(ctx, cli)
-	ok, err := curd.TryAcquireLock("lock", "uuid", time.Second*60)
+	ok, err := curd.TryLock("lock", "uuid", 1)
 	log.Print(ok)
 	if err != nil {
 		t.Fatalf("lock failed: %s", err.Error())
@@ -121,7 +121,7 @@ func TestLockConcurrency(t *testing.T) {
 			defer wg.Done()
 
 			// 尝试获取锁
-			ok, err := curd.TryAcquireLock(lockKey, fmt.Sprintf("%d", id), time.Second*3)
+			ok, err := curd.TryLock(lockKey, fmt.Sprintf("%d", id), 3)
 			if err != nil {
 				log.Fatalf(" goroutine %d 获取锁失败: %v", id, err)
 			}
@@ -177,19 +177,19 @@ func TestLockConcurrencyBlocking(t *testing.T) {
 			defer wg.Done()
 
 			// 尝试获取锁
-			ok, err := curd.TryAcquireLockBlocking(lockKey, fmt.Sprintf("%d", id), time.Second*3, time.Second*1)
+			ok, err := curd.TryLockBlocking(lockKey, fmt.Sprintf("%d", id), 1, time.Second*5)
 			if err != nil {
 				log.Printf(" goroutine %d 获取锁失败: %v", id, err)
 			}
-			log.Printf("goroutine %d 获取锁", id)
 			if ok {
+				log.Printf("goroutine %d 获取锁", id)
 				// 更新共享状态
 				counter++
 				if counter > 1 {
 					log.Fatal("多个goroutine同时访问临界区")
 				}
 				// doing
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(500 * time.Millisecond)
 				log.Printf("goroutine %d doing....", id)
 				counter--
 				// 释放锁
