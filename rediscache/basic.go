@@ -15,5 +15,5 @@ type BasicCrud interface {
 	Get(key string) (val string, err error)
 	UnLock(key, uuid string) error
 	TryLock(key, uuid string, expiration int) (bool, error)
-	TryLockBlocking(key, uuid string, expiration int, timeout time.Duration) (bool, error)
+	TryLockBlocking(key, uuid string, expiration, reTry int, timeout time.Duration) (bool, error)
 }

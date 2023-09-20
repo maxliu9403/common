@@ -31,7 +31,7 @@ func (c checkData) UnmarshalBinary(data []byte) error {
 }
 
 var testConfig = Config{
-	Addr:       "127.0.0.1:6380",
+	Addr:       "127.0.0.1:6379",
 	Password:   "123456",
 	ServerType: "standalone",
 }
@@ -125,8 +125,8 @@ func TestLockConcurrency(t *testing.T) {
 			if err != nil {
 				log.Fatalf(" goroutine %d 获取锁失败: %v", id, err)
 			}
-			log.Printf("goroutine %d 获取锁", id)
 			if ok {
+				log.Printf("goroutine %d 获取锁", id)
 				// 更新共享状态
 				counter++
 				if counter > 1 {
@@ -175,9 +175,8 @@ func TestLockConcurrencyBlocking(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-
 			// 尝试获取锁
-			ok, err := curd.TryLockBlocking(lockKey, fmt.Sprintf("%d", id), 1, time.Second*5)
+			ok, err := curd.TryLockBlocking(lockKey, fmt.Sprintf("%d", id), 1, 2, time.Second*3)
 			if err != nil {
 				log.Printf(" goroutine %d 获取锁失败: %v", id, err)
 			}

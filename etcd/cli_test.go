@@ -16,7 +16,7 @@ const (
 func initEtcd() (cancelFunc context.CancelFunc, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	etcdConfig := &Config{
-		Endpoints: "127.0.0.1:3379",
+		Endpoints: "127.0.0.1:2379",
 	}
 	err = etcdConfig.Init(ctx)
 	if err != nil {

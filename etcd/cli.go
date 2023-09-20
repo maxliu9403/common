@@ -229,7 +229,7 @@ func (e *Client) keepAlive(leaseCtx context.Context, ttl int64, leaseID clientv3
 }
 
 // TryLockBlocking 阻塞等待
-// ttl:加锁时间（秒）
+// ttl:加锁时间（秒）0表示永不过期
 // timeout 等待加锁时间
 func (e *Client) TryLockBlocking(key string, ttl int64, timeout time.Duration) (grantResp *clientv3.LeaseGrantResponse, err error) {
 	timeoutCtx, cancel := context.WithTimeout(e.ctx, timeout)
@@ -243,6 +243,8 @@ func (e *Client) TryLockBlocking(key string, ttl int64, timeout time.Duration) (
 	shouldContinueWatching := true // 用于控制外部循环
 	for {
 		select {
+		case <-e.ctx.Done():
+			return nil, fmt.Errorf("failed to acquire etcd lock, ctx done %v: %v", timeout, e.ctx.Err())
 		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf("failed to acquire etcd lock within %v: %v", timeout, timeoutCtx.Err())
 		default:
@@ -287,6 +289,7 @@ func (e *Client) TryLockBlocking(key string, ttl int64, timeout time.Duration) (
 }
 
 // TryLock 非阻塞
+// ttl:加锁时间（秒）0表示永不过期
 func (e *Client) TryLock(key string, ttl int64) (grantResp *clientv3.LeaseGrantResponse, err error) {
 	if err = e.checkClient(); err != nil {
 		return
