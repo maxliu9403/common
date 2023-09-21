@@ -52,7 +52,7 @@ func (c *CliConfig) CreateEtcdV3Client() error {
 		logger.Error(err.Error())
 		return err
 	}
-
+	logger.Info("connecting to etcd... ")
 	m, err := cli.Cluster.MemberList(c.ctx)
 	if err != nil {
 		logger.Error(err.Error())

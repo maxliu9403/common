@@ -14,13 +14,13 @@ import (
 )
 
 type Config struct {
-	Endpoints    string `yaml:"endpoints" env:"ETCD_ENDPOINT"`
-	DialTimeout  int    `yaml:"dial_timeout"`
-	Username     string `yaml:"username"`
-	Password     string `yaml:"password"`
-	CAFilePath   string `yaml:"ca_file_path"`
-	CertFilePath string `yaml:"cert_file_path"`
-	KeyFilePath  string `yaml:"key_file_path"`
+	Endpoints    string `yaml:"endpoints" env:"ETCD_ENDPOINT" env-description:"address of etcd cluster"`
+	DialTimeout  int    `yaml:"dial_timeout" env:"DIAL_TIMEOUT" env-default:"5" env-description:"is the timeout for failing to establish a connection"`
+	Username     string `yaml:"username" env:"USER_NAME" env-description:"username of etcd cluster"`
+	Password     string `yaml:"password" env:"PASS_WORD" env-description:"password of etcd cluster"`
+	CAFilePath   string `yaml:"ca_file_path" env:"CA_FILE_PATH"`
+	CertFilePath string `yaml:"cert_file_path" env:"CERT_FILE_PATH"`
+	KeyFilePath  string `yaml:"key_file_path" env:"KEY_FILE_PATH"`
 }
 
 func (c *Config) Init(ctx context.Context) error {
