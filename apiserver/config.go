@@ -108,7 +108,14 @@ func (c *APIConfig) initService(ctx context.Context, opts *serverOptions) (err e
 	}
 
 	if c.Etcd.Endpoints != "" {
-		c.Etcd.Init(ctx)
+		err = c.Etcd.Init(ctx)
+		if err != nil {
+			return
+		}
+		err = etcd.Default().CreateEtcdV3Client()
+		if err != nil {
+			return
+		}
 	}
 
 	return err

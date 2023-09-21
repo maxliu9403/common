@@ -255,7 +255,7 @@ func (e *Client) TryLockBlocking(key string, ttl int64, timeout time.Duration) (
 			}
 
 			txn := clientv3.NewKV(e.cli).Txn(e.ctx)
-			// 判断key是否存在，不存在将 key 设置为当前时间， 并关联到前面创建的租约
+			// 判断key是否存在，不存在将 key 设置为当前时间，并关联到前面创建的租约
 			txn.If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).
 				Then(clientv3.OpPut(key, time.Now().String(), clientv3.WithLease(lease.ID))).
 				Else()
@@ -304,7 +304,7 @@ func (e *Client) TryLock(key string, ttl int64) (grantResp *clientv3.LeaseGrantR
 	}
 
 	txn := clientv3.NewKV(e.cli).Txn(e.ctx)
-	// 判断key是否存在，不存在将 key 设置为当前时间， 并关联到前面创建的租约
+	// 判断key是否存在，不存在将 key 设置为当前时间，并关联到前面创建的租约
 	txn.If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).
 		Then(clientv3.OpPut(key, time.Now().String(), clientv3.WithLease(lease.ID))).
 		Else()
