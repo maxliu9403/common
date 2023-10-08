@@ -100,6 +100,12 @@ func NewColumnField(field reflect.StructField, name string) ColumnField {
 	}
 }
 
+func (sf MyStructFields) GetFuzzyField() []string {
+	fields := sf.strField
+	fields = append(fields, sf.numField...)
+	return fields
+}
+
 func IsNumber(kind reflect.Kind) bool {
 	numberKinds := []reflect.Kind{
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,

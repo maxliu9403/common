@@ -62,7 +62,7 @@ func (c *CRUDImpl) GetList(q BasicQuery, model, list interface{}) (total int64, 
 
 	// 全局模糊
 	if q.Keyword != "" {
-		fields := gadget.FieldsFromModel(model, db, true).GetStringField()
+		fields := gadget.FieldsFromModel(model, db, true).GetFuzzyField()
 		db.Scopes(KeywordGenerator(fields, q.Keyword))
 	}
 
