@@ -1,6 +1,6 @@
 module github.com/maxliu9403/common
 
-go 1.18
+go 1.23.5
 
 require (
 	github.com/Shopify/sarama v1.30.1
