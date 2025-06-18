@@ -200,3 +200,17 @@ func GinFormatterLog() gin.HandlerFunc {
 		)
 	})
 }
+
+func AdminAuthMiddleware(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		expected := "AdminSecret " + secret
+		if header != expected {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "unauthorized admin access",
+			})
+			return
+		}
+		c.Next()
+	}
+}
