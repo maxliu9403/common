@@ -352,3 +352,15 @@ func (d *DemoLog) Error(msg string) {
 func (d *DemoLog) Infof(template string, args ...interface{}) {
 	Default().Infof(template, args...)
 }
+
+// PrintPrettyStructLog 打印结构体内容（格式化 JSON），主要用于调试或结构化输出。
+func PrintPrettyStructLog(data interface{}) []byte {
+	pretty, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		// 打印错误日志
+		Default().Warnf("序列化失败: %v，使用原始格式", err)
+		// 返回原始结构体的字符串表示（非 JSON）
+		return []byte(fmt.Sprintf("%+v", data))
+	}
+	return pretty
+}
