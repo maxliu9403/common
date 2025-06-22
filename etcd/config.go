@@ -5,10 +5,11 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/maxliu9403/common/logger"
 	"io/ioutil"
 	"strings"
 	"time"
+
+	"github.com/maxliu9403/common/logger"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

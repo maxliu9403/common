@@ -28,6 +28,23 @@ func (j *Job) Terminate() {
 	j.Clear()
 }
 
+func (j *Job) ListEntries() []cron.Entry {
+	return j.cronJobs.Entries()
+}
+
+func (j *Job) RemoveJobByID(id cron.EntryID) {
+	j.cronJobs.Remove(id)
+}
+
+func (j *Job) HasRunningJobs() bool {
+	for _, entry := range j.cronJobs.Entries() {
+		if !entry.Next.IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
 func (j *Job) Clear() {
 	for _, entry := range j.cronJobs.Entries() {
 		j.cronJobs.Remove(entry.ID)

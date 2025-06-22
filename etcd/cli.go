@@ -3,11 +3,12 @@ package etcd
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/maxliu9403/common/logger"
 	"github.com/samber/lo"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"time"
 )
 
 var (
@@ -180,7 +181,6 @@ func (e *Client) Delete(key string) (err error) {
 }
 
 /*
-
 在分布式系统中，续约是一个重要的机制，尤其是当我们使用基于租约的锁或其他资源时。以下是为什么需要续约的几个原因：
 
 1.处理长时间运行的任务：当一个客户端获取锁并开始执行任务时，如果任务的执行时间超过了锁的租约时间，那么锁会在任务完成之前自动过期。
@@ -199,7 +199,6 @@ func (e *Client) Delete(key string) (err error) {
 通过允许客户端续约其锁，我们可以减少锁的争用，从而提高系统的整体效率。
 
 总的来说，续约机制为分布式锁提供了一个有效的方式来管理资源的生命周期，确保数据的一致性，并提高系统的可靠性和效率。
-
 */
 func (e *Client) keepAlive(leaseCtx context.Context, ttl int64, leaseID clientv3.LeaseID) {
 	// 特殊case，避免interval=0时触发NewTicker的Panic

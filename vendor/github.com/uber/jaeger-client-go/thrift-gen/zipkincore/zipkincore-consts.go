@@ -2,11 +2,12 @@
 
 package zipkincore
 
-import(
+import (
 	"bytes"
 	"context"
 	"fmt"
 	"time"
+
 	"github.com/uber/jaeger-client-go/thrift"
 )
 
@@ -36,4 +37,3 @@ const MESSAGE_ADDR = "ma"
 
 func init() {
 }
-

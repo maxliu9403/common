@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"github.com/maxliu9403/common/etcd"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/maxliu9403/common/etcd"
 )
 
 var testConfig = etcd.Config{

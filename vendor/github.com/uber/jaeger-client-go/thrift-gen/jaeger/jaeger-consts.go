@@ -2,11 +2,12 @@
 
 package jaeger
 
-import(
+import (
 	"bytes"
 	"context"
 	"fmt"
 	"time"
+
 	"github.com/uber/jaeger-client-go/thrift"
 )
 
@@ -17,7 +18,5 @@ var _ = context.Background
 var _ = time.Now
 var _ = bytes.Equal
 
-
 func init() {
 }
-

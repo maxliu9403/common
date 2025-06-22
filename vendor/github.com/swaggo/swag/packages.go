@@ -4,11 +4,12 @@ import (
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
-	"golang.org/x/tools/go/loader"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"golang.org/x/tools/go/loader"
 )
 
 // PackagesDefinitions map[package import path]*PackageDefinitions.

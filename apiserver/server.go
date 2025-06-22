@@ -11,11 +11,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/maxliu9403/common/ginpprof"
 	"github.com/maxliu9403/common/logger"
 	"github.com/maxliu9403/common/middleware"
 	"github.com/maxliu9403/common/tracer"
-	"github.com/gin-gonic/gin"
 	"github.com/opentracing/opentracing-go"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"

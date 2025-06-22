@@ -2,15 +2,15 @@
 
 package agent
 
-import(
+import (
 	"bytes"
 	"context"
 	"fmt"
 	"time"
+
 	"github.com/uber/jaeger-client-go/thrift"
 	"github.com/uber/jaeger-client-go/thrift-gen/jaeger"
 	"github.com/uber/jaeger-client-go/thrift-gen/zipkincore"
-
 )
 
 // (needed to ensure safety because of naive import list construction.)
@@ -25,4 +25,3 @@ var _ = zipkincore.GoUnusedProtection__
 
 func init() {
 }
-
