@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 @Date: 2021/11/10 16:04
 @Author: max.liu
@@ -44,3 +47,4 @@ func init() {
 		}
 	}()
 }
+
