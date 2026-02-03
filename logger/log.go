@@ -129,6 +129,19 @@ func Debug(args ...interface{}) {
 	Default().Debug(args...)
 }
 
+// DebugWithTrace 调试日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+func DebugWithTrace(ctx context.Context, args ...interface{}) {
+	spanData := extractSpan(ctx)
+	if spanData == nil {
+		Default().Debug(args...)
+		return
+	}
+
+	l := With(spanData...)
+	l.Debug(args...)
+}
+
 // Info uses fmt.Sprint to construct and log a message.
 func Info(args ...interface{}) {
 	Default().Info(args...)
@@ -200,6 +213,19 @@ func Fatal(args ...interface{}) {
 // Debugf uses fmt.Sprintf to log a templated message.
 func Debugf(template string, args ...interface{}) {
 	Default().Debugf(template, args...)
+}
+
+// DebugfWithTrace 格式化调试日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+func DebugfWithTrace(ctx context.Context, template string, args ...interface{}) {
+	spanData := extractSpan(ctx)
+	if spanData == nil {
+		Default().Debugf(template, args...)
+		return
+	}
+
+	l := With(spanData...)
+	l.Debugf(template, args...)
 }
 
 // Infof uses fmt.Sprintf to log a templated message.
