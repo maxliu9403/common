@@ -46,15 +46,15 @@ const (
 //
 // To implement a custom value setter you need to add a SetValue function to your type that will receive a string raw value:
 //
-//	type MyField string
+// 	type MyField string
 //
-//	func (f *MyField) SetValue(s string) error {
-//		if s == "" {
-//			return fmt.Errorf("field value can't be empty")
-//		}
-//		*f = MyField("my field is: " + s)
-//		return nil
-//	}
+// 	func (f *MyField) SetValue(s string) error {
+// 		if s == "" {
+// 			return fmt.Errorf("field value can't be empty")
+// 		}
+// 		*f = MyField("my field is: " + s)
+// 		return nil
+// 	}
 type Setter interface {
 	SetValue(string) error
 }
@@ -69,20 +69,20 @@ type Updater interface {
 //
 // Example:
 //
-//	type ConfigDatabase struct {
-//		Port     string `yaml:"port" env:"PORT" env-default:"5432"`
-//		Host     string `yaml:"host" env:"HOST" env-default:"localhost"`
-//		Name     string `yaml:"name" env:"NAME" env-default:"postgres"`
-//		User     string `yaml:"user" env:"USER" env-default:"user"`
-//		Password string `yaml:"password" env:"PASSWORD"`
-//	}
+//	 type ConfigDatabase struct {
+//	 	Port     string `yaml:"port" env:"PORT" env-default:"5432"`
+//	 	Host     string `yaml:"host" env:"HOST" env-default:"localhost"`
+//	 	Name     string `yaml:"name" env:"NAME" env-default:"postgres"`
+//	 	User     string `yaml:"user" env:"USER" env-default:"user"`
+//	 	Password string `yaml:"password" env:"PASSWORD"`
+//	 }
 //
-//	var cfg ConfigDatabase
+//	 var cfg ConfigDatabase
 //
-//	err := cleanenv.ReadConfig("config.yml", &cfg)
-//	if err != nil {
-//	    ...
-//	}
+//	 err := cleanenv.ReadConfig("config.yml", &cfg)
+//	 if err != nil {
+//	     ...
+//	 }
 func ReadConfig(path string, cfg interface{}) error {
 	err := parseFile(path, cfg)
 	if err != nil {

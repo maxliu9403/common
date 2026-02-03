@@ -1,4 +1,3 @@
-//go:build prebuild
 // +build prebuild
 
 package main

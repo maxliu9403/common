@@ -1,4 +1,3 @@
-//go:build !notfastpath
 // +build !notfastpath
 
 // Copyright (c) 2012-2018 Ugorji Nwoke. All rights reserved.

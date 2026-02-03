@@ -32,6 +32,12 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Context key type for request_id to avoid key collisions
+type contextKey string
+
+// RequestIDKey is the context key for storing request_id
+const RequestIDKey contextKey = "request_id"
+
 var (
 	DefaultLog *DemoLog
 )
@@ -294,6 +300,60 @@ func Fatalw(msg string, keysAndValues ...interface{}) {
 	Default().Fatalw(msg, keysAndValues...)
 }
 
+// ============================================================================
+// 结构化日志方法（带追踪字段）- *wWithTrace 系列
+// 这些方法会自动从 Context 中提取 request_id、trace_id、span_id 并添加到日志中
+// ============================================================================
+
+// DebugwWithTrace 结构化调试日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+func DebugwWithTrace(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	spanData := extractSpan(ctx)
+	if spanData == nil {
+		Default().Debugw(msg, keysAndValues...)
+		return
+	}
+	// 将追踪字段放在最前面，用户自定义字段在后面
+	allFields := append(spanData, keysAndValues...)
+	Default().Debugw(msg, allFields...)
+}
+
+// InfowWithTrace 结构化信息日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+func InfowWithTrace(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	spanData := extractSpan(ctx)
+	if spanData == nil {
+		Default().Infow(msg, keysAndValues...)
+		return
+	}
+	allFields := append(spanData, keysAndValues...)
+	Default().Infow(msg, allFields...)
+}
+
+// WarnwWithTrace 结构化警告日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+func WarnwWithTrace(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	spanData := extractSpan(ctx)
+	if spanData == nil {
+		Default().Warnw(msg, keysAndValues...)
+		return
+	}
+	allFields := append(spanData, keysAndValues...)
+	Default().Warnw(msg, allFields...)
+}
+
+// ErrorwWithTrace 结构化错误日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+func ErrorwWithTrace(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	spanData := extractSpan(ctx)
+	if spanData == nil {
+		Default().Errorw(msg, keysAndValues...)
+		return
+	}
+	allFields := append(spanData, keysAndValues...)
+	Default().Errorw(msg, allFields...)
+}
+
 // Errort uses fmt.Sprintf to log a templated message.
 func Errort(template string, args ...interface{}) error {
 	Default().Errorf(template, args...)
@@ -316,25 +376,55 @@ func With(args ...interface{}) *zap.SugaredLogger {
 	return Default().With(args...)
 }
 
+// extractSpan 从 Context 中提取追踪信息，包括 request_id、trace_id 和 span_id
+// 返回的是 key-value 对的切片，用于结构化日志输出
 func extractSpan(ctx context.Context) []interface{} {
-	spanCtx, err := gadget.ExtractTraceSpan(ctx)
-	if err != nil {
-		return nil
-	}
+	var res []interface{}
 
-	span := opentracing.SpanFromContext(spanCtx)
-	if span != nil {
-		jaegerCtx, ok := span.Context().(jaeger.SpanContext)
-		if ok {
-			res := []interface{}{
-				"trace_id", jaegerCtx.TraceID().String(),
-				"span_id", jaegerCtx.SpanID().String(),
-			}
-			return res
+	// 1. 提取 request_id (优先级最高，便于 ELK 搜索)
+	if requestID := ctx.Value(RequestIDKey); requestID != nil {
+		if id, ok := requestID.(string); ok && id != "" {
+			res = append(res, "request_id", id)
 		}
 	}
 
-	return nil
+	// 2. 提取 trace_id 和 span_id (来自 OpenTracing/Jaeger)
+	spanCtx, err := gadget.ExtractTraceSpan(ctx)
+	if err == nil {
+		span := opentracing.SpanFromContext(spanCtx)
+		if span != nil {
+			if jaegerCtx, ok := span.Context().(jaeger.SpanContext); ok {
+				res = append(res,
+					"trace_id", jaegerCtx.TraceID().String(),
+					"span_id", jaegerCtx.SpanID().String(),
+				)
+			}
+		}
+	}
+
+	// 如果没有任何追踪信息，返回 nil
+	if len(res) == 0 {
+		return nil
+	}
+
+	return res
+}
+
+// WithRequestID 将 request_id 注入到 Context 中
+// 用于在请求入口处（如中间件）设置 request_id，后续的日志调用会自动包含该 ID
+func WithRequestID(ctx context.Context, requestID string) context.Context {
+	return context.WithValue(ctx, RequestIDKey, requestID)
+}
+
+// RequestIDFromContext 从 Context 中提取 request_id
+// 如果 Context 中不存在 request_id 或类型不匹配，返回空字符串
+func RequestIDFromContext(ctx context.Context) string {
+	if v := ctx.Value(RequestIDKey); v != nil {
+		if id, ok := v.(string); ok {
+			return id
+		}
+	}
+	return ""
 }
 
 type Logger interface {
