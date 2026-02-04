@@ -104,7 +104,7 @@ func GinInterceptor(logResponse bool) gin.HandlerFunc {
 		}
 
 		// 使用结构化日志，自动包含 request_id
-		logger.InfofWithTrace(c.Request.Context(), "request details",
+		logger.InfoWithTrace(c.Request.Context(), "request details",
 			"operator", getRequestUser(c.Request.Header),
 			"uri", c.Request.RequestURI,
 			"method", c.Request.Method,
