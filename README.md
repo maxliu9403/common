@@ -2,11 +2,9 @@
 
 ![common](./logo.png)
 
-
 集成了项目开发过程中经常用到的基础包，欢迎 Merge Request。由于工具包的项目特性，所以代码平铺在根目录下。
 
 `go get -u github.com/maxliu9403/common`
-
 
 ## 简要说明
 
@@ -42,3 +40,45 @@
 ```
 
 一些客户端使用方法可以参考对应的 `example`
+
+## Middleware 中间件
+
+### GinInterceptorWithTrace
+
+带 OpenTracing 支持的 HTTP 请求拦截器，支持自定义 Span Tags 注入。
+
+```go
+import "github.com/maxliu9403/common/middleware"
+
+// 基础用法
+r.Use(middleware.GinInterceptorWithTrace(tracer, true))
+
+// 自定义 Span Tags（外部系统注入 K:V）
+r.Use(middleware.GinInterceptorWithTrace(tracer, true,
+    middleware.WithTagProvider(func(c *gin.Context) map[string]interface{} {
+        return map[string]interface{}{
+            "user_id":   c.GetHeader("X-User-ID"),
+            "tenant_id": c.GetHeader("X-Tenant-ID"),
+            "app_name":  "my-service",
+        }
+    }),
+))
+
+// 多个 Provider 组合
+r.Use(middleware.GinInterceptorWithTrace(tracer, true,
+    middleware.WithTagProvider(userTagProvider),
+    middleware.WithTagProvider(businessTagProvider),
+))
+```
+
+**SpanTagProvider 函数签名：**
+
+```go
+type SpanTagProvider func(c *gin.Context) map[string]interface{}
+```
+
+通过 `WithTagProvider` 注入的 Tags 会在每个请求的 Span 创建后自动应用，可用于：
+
+- 用户标识 (`user_id`, `tenant_id`)
+- 业务标签 (`order_type`, `payment_method`)
+- 服务元数据 (`app_name`, `version`, `env`)

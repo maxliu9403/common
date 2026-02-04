@@ -20,6 +20,54 @@ import (
 	"github.com/maxliu9403/common/logger"
 )
 
+// ========== Span Tag Provider 机制 ==========
+
+// SpanTagProvider 定义 Span Tag 提供者函数类型
+// 外部系统可以实现此函数来注入自定义的 K:V 到 Span 中
+// 参数 c: Gin Context，可获取请求头、路径、用户信息等
+// 返回值: map[string]interface{}，Key 为 Tag 名称，Value 为 Tag 值
+type SpanTagProvider func(c *gin.Context) map[string]interface{}
+
+// TraceOptions 配置选项
+type TraceOptions struct {
+	TagProviders []SpanTagProvider
+}
+
+// TraceOption 配置函数类型
+type TraceOption func(*TraceOptions)
+
+// WithTagProvider 添加自定义 Tag 提供者
+// 使用示例:
+//
+//	middleware.GinInterceptorWithTrace(tracer, true,
+//	    middleware.WithTagProvider(func(c *gin.Context) map[string]interface{} {
+//	        return map[string]interface{}{
+//	            "user_id":   c.GetHeader("X-User-ID"),
+//	            "tenant_id": c.GetHeader("X-Tenant-ID"),
+//	        }
+//	    }),
+//	)
+func WithTagProvider(provider SpanTagProvider) TraceOption {
+	return func(opts *TraceOptions) {
+		opts.TagProviders = append(opts.TagProviders, provider)
+	}
+}
+
+// applyCustomTags 应用自定义 Tags 到 Span
+func applyCustomTags(span opentracing.Span, c *gin.Context, opts *TraceOptions) {
+	if opts == nil {
+		return
+	}
+	for _, provider := range opts.TagProviders {
+		if provider != nil {
+			tags := provider(c)
+			for k, v := range tags {
+				span.SetTag(k, v)
+			}
+		}
+	}
+}
+
 type httpReqResLog struct {
 	Operator   string `json:"operator"`
 	URI        string `json:"uri"`
@@ -120,7 +168,25 @@ func GinInterceptor(logResponse bool) gin.HandlerFunc {
 // 功能：记录请求日志、注入 request_id 和 tracing span 实现全链路追踪
 // 参数 tra: OpenTracing tracer 实例
 // 参数 logResponse: 是否记录响应体内容
-func GinInterceptorWithTrace(tra opentracing.Tracer, logResponse bool) gin.HandlerFunc {
+// 参数 opts: 可选的配置选项，支持通过 WithTagProvider 注入自定义 Span Tags
+//
+// 使用示例:
+//
+//	middleware.GinInterceptorWithTrace(tracer, true,
+//	    middleware.WithTagProvider(func(c *gin.Context) map[string]interface{} {
+//	        return map[string]interface{}{
+//	            "user_id":   c.GetHeader("X-User-ID"),
+//	            "tenant_id": c.GetHeader("X-Tenant-ID"),
+//	            "app_name":  "my-service",
+//	        }
+//	    }),
+//	)
+func GinInterceptorWithTrace(tra opentracing.Tracer, logResponse bool, opts ...TraceOption) gin.HandlerFunc {
+	// 解析配置选项
+	options := &TraceOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
 	return func(c *gin.Context) {
 		var (
 			bodyBytes []byte
@@ -178,6 +244,9 @@ func GinInterceptorWithTrace(tra opentracing.Tracer, logResponse bool) gin.Handl
 			span.SetTag("request_id", requestID)
 			span.SetTag("http.url", c.Request.URL.Path)
 			span.SetTag("http.method", c.Request.Method)
+
+			// 应用外部注入的自定义 Tags
+			applyCustomTags(span, c, options)
 
 			// 将 span 存入 context，同时保留 request_id
 			spanContext := opentracing.ContextWithSpan(c.Request.Context(), span)
