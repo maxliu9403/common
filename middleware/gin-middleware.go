@@ -174,6 +174,11 @@ func GinInterceptorWithTrace(tra opentracing.Tracer, logResponse bool) gin.Handl
 			ext.Component.Set(span, "Gin")
 			ext.SpanKindRPCServer.Set(span)
 
+			// 将 request_id 设置为 Tag，支持在 Jaeger UI 中按 request_id 检索
+			span.SetTag("request_id", requestID)
+			span.SetTag("http.url", c.Request.URL.Path)
+			span.SetTag("http.method", c.Request.Method)
+
 			// 将 span 存入 context，同时保留 request_id
 			spanContext := opentracing.ContextWithSpan(c.Request.Context(), span)
 			c.Set("opentracing-context", spanContext)
