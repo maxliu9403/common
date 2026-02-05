@@ -27,6 +27,7 @@ import (
 
 	"github.com/maxliu9403/common/gadget"
 	"github.com/opentracing/opentracing-go"
+	otlog "github.com/opentracing/opentracing-go/log"
 	"github.com/uber/jaeger-client-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -131,15 +132,17 @@ func Debug(args ...interface{}) {
 
 // DebugWithTrace 调试日志（带追踪字段）
 // 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func DebugWithTrace(ctx context.Context, args ...interface{}) {
 	spanData := extractSpan(ctx)
+	message := fmt.Sprint(args...)
 	if spanData == nil {
 		Default().Debug(args...)
-		return
+	} else {
+		l := With(spanData...)
+		l.Debug(args...)
 	}
-
-	l := With(spanData...)
-	l.Debug(args...)
+	logToSpan(ctx, "debug", message)
 }
 
 // Info uses fmt.Sprint to construct and log a message.
@@ -147,15 +150,19 @@ func Info(args ...interface{}) {
 	Default().Info(args...)
 }
 
+// InfoWithTrace 信息日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func InfoWithTrace(ctx context.Context, args ...interface{}) {
 	spanData := extractSpan(ctx)
+	message := fmt.Sprint(args...)
 	if spanData == nil {
 		Default().Info(args...)
-		return
+	} else {
+		l := With(spanData...)
+		l.Info(args...)
 	}
-
-	l := With(spanData...)
-	l.Info(args...)
+	logToSpan(ctx, "info", message)
 }
 
 // Warn uses fmt.Sprint to construct and log a message.
@@ -163,15 +170,19 @@ func Warn(args ...interface{}) {
 	Default().Warn(args...)
 }
 
+// WarnWithTrace 警告日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func WarnWithTrace(ctx context.Context, args ...interface{}) {
 	spanData := extractSpan(ctx)
+	message := fmt.Sprint(args...)
 	if spanData == nil {
 		Default().Warn(args...)
-		return
+	} else {
+		l := With(spanData...)
+		l.Warn(args...)
 	}
-
-	l := With(spanData...)
-	l.Warn(args...)
+	logToSpan(ctx, "warn", message)
 }
 
 // Error uses fmt.Sprint to construct and log a message.
@@ -179,15 +190,19 @@ func Error(args ...interface{}) {
 	Default().Error(args...)
 }
 
+// ErrorWithTrace 错误日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func ErrorWithTrace(ctx context.Context, args ...interface{}) {
 	spanData := extractSpan(ctx)
+	message := fmt.Sprint(args...)
 	if spanData == nil {
 		Default().Error(args...)
-		return
+	} else {
+		l := With(spanData...)
+		l.Error(args...)
 	}
-
-	l := With(spanData...)
-	l.Error(args...)
+	logToSpan(ctx, "error", message)
 }
 
 // Panic uses fmt.Sprint to construct and log a message, then panics.
@@ -217,15 +232,17 @@ func Debugf(template string, args ...interface{}) {
 
 // DebugfWithTrace 格式化调试日志（带追踪字段）
 // 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func DebugfWithTrace(ctx context.Context, template string, args ...interface{}) {
 	spanData := extractSpan(ctx)
+	message := fmt.Sprintf(template, args...)
 	if spanData == nil {
-		Default().Debugf(template, args...)
-		return
+		Default().Debug(message)
+	} else {
+		l := With(spanData...)
+		l.Debug(message)
 	}
-
-	l := With(spanData...)
-	l.Debugf(template, args...)
+	logToSpan(ctx, "debug", message)
 }
 
 // Infof uses fmt.Sprintf to log a templated message.
@@ -233,15 +250,19 @@ func Infof(template string, args ...interface{}) {
 	Default().Infof(template, args...)
 }
 
+// InfofWithTrace 格式化信息日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func InfofWithTrace(ctx context.Context, template string, args ...interface{}) {
 	spanData := extractSpan(ctx)
+	message := fmt.Sprintf(template, args...)
 	if spanData == nil {
-		Default().Infof(template, args...)
-		return
+		Default().Info(message)
+	} else {
+		l := With(spanData...)
+		l.Info(message)
 	}
-
-	l := With(spanData...)
-	l.Infof(template, args...)
+	logToSpan(ctx, "info", message)
 }
 
 // Warnf uses fmt.Sprintf to log a templated message.
@@ -249,15 +270,19 @@ func Warnf(template string, args ...interface{}) {
 	Default().Warnf(template, args...)
 }
 
+// WarnfWithTrace 格式化警告日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func WarnfWithTrace(ctx context.Context, template string, args ...interface{}) {
 	spanData := extractSpan(ctx)
+	message := fmt.Sprintf(template, args...)
 	if spanData == nil {
-		Default().Warnf(template, args...)
-		return
+		Default().Warn(message)
+	} else {
+		l := With(spanData...)
+		l.Warn(message)
 	}
-
-	l := With(spanData...)
-	l.Warnf(template, args...)
+	logToSpan(ctx, "warn", message)
 }
 
 // Errorf uses fmt.Sprintf to log a templated message.
@@ -265,15 +290,19 @@ func Errorf(template string, args ...interface{}) {
 	Default().Errorf(template, args...)
 }
 
+// ErrorfWithTrace 格式化错误日志（带追踪字段）
+// 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func ErrorfWithTrace(ctx context.Context, template string, args ...interface{}) {
 	spanData := extractSpan(ctx)
+	message := fmt.Sprintf(template, args...)
 	if spanData == nil {
-		Default().Errorf(template, args...)
-		return
+		Default().Error(message)
+	} else {
+		l := With(spanData...)
+		l.Error(message)
 	}
-
-	l := With(spanData...)
-	l.Errorf(template, args...)
+	logToSpan(ctx, "error", message)
 }
 
 // Panicf uses fmt.Sprintf to log a templated message, then panics.
@@ -333,51 +362,59 @@ func Fatalw(msg string, keysAndValues ...interface{}) {
 
 // DebugwWithTrace 结构化调试日志（带追踪字段）
 // 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func DebugwWithTrace(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	spanData := extractSpan(ctx)
 	if spanData == nil {
 		Default().Debugw(msg, keysAndValues...)
-		return
+	} else {
+		// 将追踪字段放在最前面，用户自定义字段在后面
+		allFields := append(spanData, keysAndValues...)
+		Default().Debugw(msg, allFields...)
 	}
-	// 将追踪字段放在最前面，用户自定义字段在后面
-	allFields := append(spanData, keysAndValues...)
-	Default().Debugw(msg, allFields...)
+	logToSpan(ctx, "debug", msg)
 }
 
 // InfowWithTrace 结构化信息日志（带追踪字段）
 // 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func InfowWithTrace(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	spanData := extractSpan(ctx)
 	if spanData == nil {
 		Default().Infow(msg, keysAndValues...)
-		return
+	} else {
+		allFields := append(spanData, keysAndValues...)
+		Default().Infow(msg, allFields...)
 	}
-	allFields := append(spanData, keysAndValues...)
-	Default().Infow(msg, allFields...)
+	logToSpan(ctx, "info", msg)
 }
 
 // WarnwWithTrace 结构化警告日志（带追踪字段）
 // 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func WarnwWithTrace(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	spanData := extractSpan(ctx)
 	if spanData == nil {
 		Default().Warnw(msg, keysAndValues...)
-		return
+	} else {
+		allFields := append(spanData, keysAndValues...)
+		Default().Warnw(msg, allFields...)
 	}
-	allFields := append(spanData, keysAndValues...)
-	Default().Warnw(msg, allFields...)
+	logToSpan(ctx, "warn", msg)
 }
 
 // ErrorwWithTrace 结构化错误日志（带追踪字段）
 // 自动从 ctx 中提取 request_id、trace_id、span_id 添加到日志
+// 同时将日志写入到 Jaeger Span
 func ErrorwWithTrace(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	spanData := extractSpan(ctx)
 	if spanData == nil {
 		Default().Errorw(msg, keysAndValues...)
-		return
+	} else {
+		allFields := append(spanData, keysAndValues...)
+		Default().Errorw(msg, allFields...)
 	}
-	allFields := append(spanData, keysAndValues...)
-	Default().Errorw(msg, allFields...)
+	logToSpan(ctx, "error", msg)
 }
 
 // Errort uses fmt.Sprintf to log a templated message.
@@ -434,6 +471,23 @@ func extractSpan(ctx context.Context) []interface{} {
 	}
 
 	return res
+}
+
+// logToSpan 将日志同时写入到 Jaeger Span
+// 使日志在 Jaeger UI 中可见
+// level: "debug", "info", "warn", "error"
+// message: 日志消息
+func logToSpan(ctx context.Context, level string, message string) {
+	span := opentracing.SpanFromContext(ctx)
+	if span == nil {
+		return
+	}
+
+	// 写入到 Span 的 LogFields
+	span.LogFields(
+		otlog.String("level", level),
+		otlog.String("message", message),
+	)
 }
 
 // WithRequestID 将 request_id 注入到 Context 中
