@@ -260,21 +260,40 @@ func GinInterceptorWithTrace(tra opentracing.Tracer, logResponse bool, opts ...T
 		c.Next()
 
 		// ========== 5. 记录到 Span ==========
-		if span != nil {
-			span.LogFields(
-				log.String("request_id", requestID),
-				log.String("uri", c.Request.URL.Path),
-				log.String("method", c.Request.Method),
-				log.String("params", string(params)),
-				log.Int("status_code", c.Writer.Status()),
-			)
-		}
-
-		// ========== 6. 记录请求日志（结构化格式） ==========
+		statusCode := c.Writer.Status()
 		responseBody := ""
 		if logResponse {
 			responseBody = blw.body.String()
 		}
+
+		if span != nil {
+			// 请求日志
+			span.LogFields(
+				log.String("event", "request"),
+				log.String("request_id", requestID),
+				log.String("uri", c.Request.URL.Path),
+				log.String("method", c.Request.Method),
+				log.String("params", string(params)),
+			)
+
+			// 响应日志
+			span.LogFields(
+				log.String("event", "response"),
+				log.Int("status_code", statusCode),
+				log.String("response", responseBody),
+			)
+
+			// 如果是错误响应，设置错误标签
+			if statusCode >= 400 {
+				span.SetTag("error", true)
+				span.LogFields(
+					log.String("event", "error"),
+					log.String("message", fmt.Sprintf("HTTP %d", statusCode)),
+				)
+			}
+		}
+
+		// ========== 6. 记录请求日志（结构化格式） ==========
 
 		// 使用结构化日志，自动包含 request_id、trace_id、span_id
 		logger.DebugwWithTrace(c.Request.Context(), "request details",
