@@ -326,7 +326,7 @@ github.com/prometheus/procfs/internal/util
 # github.com/quic-go/qpack v0.6.0
 ## explicit; go 1.24
 github.com/quic-go/qpack
-# github.com/quic-go/quic-go v0.59.0
+# github.com/quic-go/quic-go v0.59.1
 ## explicit; go 1.24
 github.com/quic-go/quic-go
 github.com/quic-go/quic-go/http3
@@ -454,8 +454,8 @@ go.uber.org/zap/zapgrpc
 # golang.org/x/arch v0.20.0
 ## explicit; go 1.23.0
 golang.org/x/arch/x86/x86asm
-# golang.org/x/crypto v0.47.0
-## explicit; go 1.24.0
+# golang.org/x/crypto v0.50.0
+## explicit; go 1.25.0
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/hkdf
@@ -467,8 +467,8 @@ golang.org/x/crypto/sha3
 # golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17
 ## explicit; go 1.18
 golang.org/x/exp/constraints
-# golang.org/x/net v0.49.0
-## explicit; go 1.24.0
+# golang.org/x/net v0.53.0
+## explicit; go 1.25.0
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/html
@@ -479,6 +479,7 @@ golang.org/x/net/http2/h2c
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/httpcommon
+golang.org/x/net/internal/httpsfv
 golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/internal/socks
@@ -489,13 +490,13 @@ golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/webdav
 golang.org/x/net/webdav/internal/xml
-# golang.org/x/sys v0.40.0
-## explicit; go 1.24.0
+# golang.org/x/sys v0.43.0
+## explicit; go 1.25.0
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.33.0
-## explicit; go 1.24.0
+# golang.org/x/text v0.36.0
+## explicit; go 1.25.0
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
@@ -508,8 +509,8 @@ golang.org/x/text/width
 # golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.40.0
-## explicit; go 1.24.0
+# golang.org/x/tools v0.43.0
+## explicit; go 1.25.0
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/buildutil
 golang.org/x/tools/go/internal/cgo

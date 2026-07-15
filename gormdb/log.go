@@ -33,7 +33,7 @@ func (d DBLog) Info(ctx context.Context, msg string, data ...interface{}) {
 		return
 	}
 
-	logger.InfofWithTrace(ctx, msg, data)
+	logger.InfofWithTrace(ctx, msg, data...)
 }
 
 func (d DBLog) Warn(ctx context.Context, msg string, data ...interface{}) {
@@ -41,7 +41,7 @@ func (d DBLog) Warn(ctx context.Context, msg string, data ...interface{}) {
 		return
 	}
 
-	logger.WarnfWithTrace(ctx, msg, data)
+	logger.WarnfWithTrace(ctx, msg, data...)
 }
 
 func (d DBLog) Error(ctx context.Context, msg string, data ...interface{}) {
@@ -49,7 +49,7 @@ func (d DBLog) Error(ctx context.Context, msg string, data ...interface{}) {
 		return
 	}
 
-	logger.ErrorfWithTrace(ctx, msg, data)
+	logger.ErrorfWithTrace(ctx, msg, data...)
 }
 
 func (d DBLog) Trace(ctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
